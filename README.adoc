@@ -1,0 +1,81 @@
+= Ecobee report parser
+
+This is a very simple and minimalistic (my first try with kotlin) of an http://www.ecobee.com[ecobee] report data parser.
+
+Ecobee provides a detailed report of your thermostat to be downloaded via it's portal. The report is a CSV file including readings
+from all your thermostat plus your sensors.
+
+The report layout however is not very friendly to parse via conventional methods. The first 4 lines have some header information
+
+```
+#,Thermostat,identifier,XXXXXXXXXX
+#,Thermostat,name,Main Floor
+#,Start,date,2017-02-01
+#,End,date,2017-02-28
+```
+
+And then a CSV header information with 19 columns for the thermostat plus 2 extra columns for each sensor you have.
+
+This implementation of a parser will parse the file and extract information and regardless of how many sensors you have it will always generate a SensorData object with
+the following properties:
+
+```
+SensorData(type=temperature, name=outdoor, timestamp=Sun Nov 19 23:20:00 EST 2017, value=38.4, thermostatId=XXXXXXXXX)
+```
+
+It generates the following type of events:
+
+* temperature
+* motion
+* humidity
+* wind_speed
+* desired_heat - Heat setting on the thermostat at that time
+* desired_cool - Cool setting on the thermostat at that time
+* cool - HVAC running time
+* heat - Furnace (1s stage only) running time
+
+It will use the sensor name to define where the reading came from, using outdoor as a value for outdoor readings.
+
+
+Here's a sample of data it will generate after you feed one report to it.
+
+```
+SensorData(type=motion, name=Upstairs, timestamp=Sun Nov 19 23:20:00 EST 2017, value=0.0, thermostatId=XXXXXXXXXX)
+SensorData(type=temperature, name=outdoor, timestamp=Sun Nov 19 23:20:00 EST 2017, value=38.4, thermostatId=XXXXXXXXXX)
+SensorData(type=wind_speed, name=outdoor, timestamp=Sun Nov 19 23:20:00 EST 2017, value=8.0, thermostatId=XXXXXXXXXX)
+SensorData(type=temperature, name=Kids Bedroom 1, timestamp=Sun Nov 19 23:20:00 EST 2017, value=68.9, thermostatId=XXXXXXXXXX)
+SensorData(type=motion, name=Kids Bedroom 1, timestamp=Sun Nov 19 23:20:00 EST 2017, value=0.0, thermostatId=XXXXXXXXXX)
+SensorData(type=temperature, name=Bedroom, timestamp=Sun Nov 19 23:20:00 EST 2017, value=67.1, thermostatId=XXXXXXXXXX)
+SensorData(type=motion, name=Bedroom, timestamp=Sun Nov 19 23:20:00 EST 2017, value=0.0, thermostatId=XXXXXXXXXX)
+SensorData(type=temperature, name=Family Room, timestamp=Sun Nov 19 23:20:00 EST 2017, value=70.5, thermostatId=XXXXXXXXXX)
+SensorData(type=motion, name=Family Room, timestamp=Sun Nov 19 23:20:00 EST 2017, value=0.0, thermostatId=XXXXXXXXXX)
+SensorData(type=desired_cool, name=Upstairs, timestamp=Sun Nov 19 23:25:00 EST 2017, value=74.0, thermostatId=XXXXXXXXXX)
+SensorData(type=desired_heat, name=Upstairs, timestamp=Sun Nov 19 23:25:00 EST 2017, value=68.0, thermostatId=XXXXXXXXXX)
+SensorData(type=humidity, name=Upstairs, timestamp=Sun Nov 19 23:25:00 EST 2017, value=38.0, thermostatId=XXXXXXXXXX)
+SensorData(type=cool, name=Upstairs, timestamp=Sun Nov 19 23:25:00 EST 2017, value=0.0, thermostatId=XXXXXXXXXX)
+SensorData(type=heat, name=Upstairs, timestamp=Sun Nov 19 23:25:00 EST 2017, value=0.0, thermostatId=XXXXXXXXXX)
+SensorData(type=temperature, name=Upstairs, timestamp=Sun Nov 19 23:25:00 EST 2017, value=69.0, thermostatId=XXXXXXXXXX)
+SensorData(type=motion, name=Upstairs, timestamp=Sun Nov 19 23:25:00 EST 2017, value=0.0, thermostatId=XXXXXXXXXX)
+SensorData(type=temperature, name=outdoor, timestamp=Sun Nov 19 23:25:00 EST 2017, value=38.4, thermostatId=XXXXXXXXXX)
+SensorData(type=wind_speed, name=outdoor, timestamp=Sun Nov 19 23:25:00 EST 2017, value=8.0, thermostatId=XXXXXXXXXX)
+SensorData(type=temperature, name=Kids Bedroom 1, timestamp=Sun Nov 19 23:25:00 EST 2017, value=68.9, thermostatId=XXXXXXXXXX)
+SensorData(type=motion, name=Kids Bedroom 1, timestamp=Sun Nov 19 23:25:00 EST 2017, value=0.0, thermostatId=XXXXXXXXXX)
+SensorData(type=temperature, name=Bedroom, timestamp=Sun Nov 19 23:25:00 EST 2017, value=67.1, thermostatId=XXXXXXXXXX)
+SensorData(type=motion, name=Bedroom, timestamp=Sun Nov 19 23:25:00 EST 2017, value=0.0, thermostatId=XXXXXXXXXX)
+SensorData(type=temperature, name=Family Room, timestamp=Sun Nov 19 23:25:00 EST 2017, value=70.5, thermostatId=XXXXXXXXXX)
+SensorData(type=motion, name=Family Room, timestamp=Sun Nov 19 23:25:00 EST 2017, value=0.0, thermostatId=XXXXXXXXXX)
+SensorData(type=desired_cool, name=Upstairs, timestamp=Sun Nov 19 23:30:00 EST 2017, value=74.0, thermostatId=XXXXXXXXXX)
+SensorData(type=desired_heat, name=Upstairs, timestamp=Sun Nov 19 23:30:00 EST 2017, value=68.0, thermostatId=XXXXXXXXXX)
+```
+
+
+== Using it
+
+The main class is `EcobeeParser`, you just need to provide an `InputStream` to it. It has an `iterator()` function that allows you to use it
+with a `Sequence`, this way, whatever you intend to do with the data (index, send via kafka) it's a matter of your choice.
+
+[code,kotlin]
+----
+val parser = EcobeeParser(FileInputStream(File("../pathToFile")))
+Sequence { parser.iterator() }.forEach { println(it) }
+----
